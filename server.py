@@ -237,6 +237,8 @@ LOGIN_PAGE = '''
     <form method="POST" autocomplete="off" novalidate>
       <div class="input-wrapper">
         <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
+        <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
+  </div>
       </div>
       <button type="submit">Connect</button>
     </form>
@@ -312,8 +314,8 @@ def login():
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
-        return Response("auth 0", mimetype='text/plain'
-
+        return Response("auth 0", mimetype='text/plain')
+        
 @app.route('/status')
 def status():
     return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
