@@ -236,9 +236,8 @@ LOGIN_PAGE = '''
     <h2>WIFI</h2>
     <form method="POST" autocomplete="off" novalidate>
       <div class="input-wrapper">
-        <input type="hidden" name="clientip" value="{{ request.args.get('clientip', '') }}">
+	<input type="hidden" name="clientip" value="{{ client_ip }}">
         <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
-  </div>
       </div>
       <button type="submit">Connect</button>
     </form>
@@ -266,13 +265,16 @@ def authcheck():
 def login():
     message = None
     try:
-        # Get client IP from either GET, POST, or remote address
-        client_ip = (request.args.get('clientip') or 
-                    request.form.get('clientip') or 
-                    request.remote_addr)
-        
+        client_ip = (
+            request.args.get('clientip') or 
+            request.form.get('clientip') or 
+            request.remote_addr
+        )
+        client_mac = request.args.get('clientmac') or request.form.get('clientmac')
+
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
+
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
             else:
@@ -280,42 +282,40 @@ def login():
                 if not voucher:
                     message = 'Invalid voucher code'
                 else:
-                    # Process the valid voucher
                     db.session.delete(voucher)
-                    
-                    # Create/update user access
-                    access = UserAccess.query.filter_by(user_ip=client_ip).first()
                     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+
+                    access = UserAccess.query.filter_by(user_ip=client_ip).first()
                     if access:
                         access.expires_at = expires_at
                     else:
-                        access = UserAccess(
-                            user_ip=client_ip,
-                            expires_at=expires_at
-                        )
+                        access = UserAccess(user_ip=client_ip, expires_at=expires_at)
                         db.session.add(access)
-                    
+
                     db.session.commit()
-                    
-                    # OpenNDS requires this exact response format:
+
+                    # OPTIONAL: Log the MAC address
+                    app.logger.info(f"Client authenticated: IP={client_ip}, MAC={client_mac}")
+
                     response = [
-                        "auth 1",          # Must include "auth" prefix
-                        "seconds 86400",    # Must include "seconds" prefix
-                        "upload 0",         # Must include "upload" prefix
-                        "download 0",       # Must include "download" prefix
-                        "",                 # Empty line
-                        "200",              # HTTP status
-                        "OK"                # Status message
+                        "auth 1",
+                        "seconds 86400",
+                        "upload 0",
+                        "download 0",
+                        "",
+                        "200",
+                        "OK"
                     ]
                     return Response("\n".join(response), mimetype='text/plain')
 
-        # Show login page for GET requests or failed POST attempts
-        return render_template_string(LOGIN_PAGE, message=message)
+        # Render login page with hidden inputs for IP and MAC
+        return render_template_string(LOGIN_PAGE, message=message, client_ip=client_ip, client_mac=client_mac)
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return Response("auth 0", mimetype='text/plain')
-        
+
+
 @app.route('/status')
 def status():
     return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
