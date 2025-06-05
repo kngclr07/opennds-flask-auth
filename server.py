@@ -264,12 +264,11 @@ def authcheck():
 def login():
     message = None
     try:
-        client_ip = request.args.get('clientip') or request.form.get('clientip') or request.remote_addr
+        # Get client IP from either GET, POST, or remote address
+        client_ip = (request.args.get('clientip') or 
+                    request.form.get('clientip') or 
+                    request.remote_addr)
         
-        if not client_ip:
-            message = 'Client IP is missing.'
-            return render_template_string(LOGIN_PAGE, message=message)
-
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
@@ -279,41 +278,41 @@ def login():
                 if not voucher:
                     message = 'Invalid voucher code'
                 else:
-                    # Delete the voucher
+                    # Process the valid voucher
                     db.session.delete(voucher)
                     
-                    # Create or update user access
+                    # Create/update user access
                     access = UserAccess.query.filter_by(user_ip=client_ip).first()
+                    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
                     if access:
-                        access.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+                        access.expires_at = expires_at
                     else:
                         access = UserAccess(
                             user_ip=client_ip,
-                            expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                            expires_at=expires_at
                         )
                         db.session.add(access)
                     
                     db.session.commit()
                     
-                    # Proper OpenNDS response format
-                    response = Response(
-                        "1\n"          # Authentication status
-                        "86400\n"      # Session duration in seconds
-                        "0\n"          # Upload limit (0 = unlimited)
-                        "0\n"          # Download limit (0 = unlimited)
-                        "\n"           # Empty line
-                        "200\n"        # HTTP status code
-                        "OK",          # Status message
-                        mimetype='text/plain'
-                    )
-                    return response
+                    # OpenNDS requires this exact response format:
+                    response = [
+                        "auth 1",          # Must include "auth" prefix
+                        "seconds 86400",    # Must include "seconds" prefix
+                        "upload 0",         # Must include "upload" prefix
+                        "download 0",       # Must include "download" prefix
+                        "",                 # Empty line
+                        "200",              # HTTP status
+                        "OK"                # Status message
+                    ]
+                    return Response("\n".join(response), mimetype='text/plain')
 
-        # For GET requests or failed POST, show the login page
+        # Show login page for GET requests or failed POST attempts
         return render_template_string(LOGIN_PAGE, message=message)
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
-        return Response("0", mimetype='text/plain')
+        return Response("auth 0", mimetype='text/plain'
 
 @app.route('/status')
 def status():
