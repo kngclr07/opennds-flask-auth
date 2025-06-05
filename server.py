@@ -298,7 +298,7 @@ def login():
                     # OPTIONAL: Log the MAC address
                     app.logger.info(f"Client authenticated: IP={client_ip}, MAC={client_mac}")
 
-                    response = [
+                    return Response("\n".join([
                         "auth_log",
                         "seconds 86400",
                         "upload 0",
@@ -306,7 +306,7 @@ def login():
                         "",
                         "200",
                         "OK"
-                    ]
+                    ]), mimetype='text/plain')
                     return Response("\n".join(response), mimetype='text/plain')
 
     except Exception as e:
