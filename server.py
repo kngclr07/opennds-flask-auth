@@ -278,7 +278,7 @@ def login():
     message = None
     try:
         if request.method == 'POST':
-            client_ip = request.form.get('clientip') or request.remote_addr
+             client_ip = request.args.get('clientip') or request.form.get('clientip') or request.remote_addr
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
