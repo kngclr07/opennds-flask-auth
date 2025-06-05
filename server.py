@@ -260,48 +260,41 @@ with app.app_context():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    message = None
-    try:
-        client_ip = request.args.get('clientip') or request.remote_addr
-        gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
-        token = request.args.get('token')
-        redir = request.args.get('redir') or 'http://google.com'
-        auth_domain = request.args.get('auth_domain', '')
-        auth_dir = request.args.get('auth_dir', '')
-        origin_url = request.args.get('originurl', '')
+    message = Hello
+    client_ip = request.args.get('clientip') or request.remote_addr
+    gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
+    token = request.args.get('token')
+    redir = request.args.get('redir') or 'http://google.com'
+    auth_domain = request.args.get('auth_domain', '')
+    auth_dir = request.args.get('auth_dir', '')
+    origin_url = request.args.get('originurl', '')
 
-        access = UserAccess.query.filter_by(user_ip=client_ip).first()
-        if access and access.is_active():
-            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
-            response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
-            if redir:
-                response_url += f"&redir={urllib.parse.quote(redir)}"
-            return Response("Auth: 1\n", mimetype='text/plain')
+    access = UserAccess.query.filter_by(user_ip=client_ip).first()
+    if access and access.is_active():
+        # User already has active access → authorize immediately
+        return Response("Auth: 1\n", mimetype='text/plain')
 
-        if request.method == 'POST':
-            code = request.form.get('code', '').strip()
-            if not code or len(code) != 7 or not code.isdigit():
-                message = 'Please enter a valid 7-digit code'
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        if not code or len(code) != 7 or not code.isdigit():
+            message = 'Please enter a valid 7-digit code'
+        else:
+            voucher = Voucher.query.filter_by(code=code).first()
+            if not voucher:
+                message = 'Invalid voucher code'
             else:
-                voucher = Voucher.query.filter_by(code=code).first()
-                if not voucher:
-                    message = 'Invalid voucher code'
-                else:
-                    db.session.delete(voucher)
-                    new_access = UserAccess(
-                        user_ip=client_ip,
-                        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
-                    )
-                    db.session.add(new_access)
-                    db.session.commit()
+                # Valid voucher: grant access and delete voucher
+                db.session.delete(voucher)
+                new_access = UserAccess(
+                    user_ip=client_ip,
+                    expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                )
+                db.session.add(new_access)
+                db.session.commit()
+                return Response("Auth: 1\n", mimetype='text/plain')
 
-                    return Response("Auth: 1\n", mimetype='text/plain')
-
-    except Exception as e:
-        app.logger.error(f"Login error: {str(e)}")
-        return "An error occurred, please try again", 500
-
-    return render_template_string(LOGIN_PAGE, message=message)
+    # If GET or POST with errors, render login form with message
+    return render_template('login.html', message=message, gateway_name=gateway_name, redir=redir)
 
 @app.route('/status')
 def status():
