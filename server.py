@@ -236,7 +236,7 @@ LOGIN_PAGE = '''
     <h2>WIFI</h2>
     <form method="POST" autocomplete="off" novalidate>
       <div class="input-wrapper">
-        <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
+        <input type="hidden" name="clientip" value="{{ request.args.get('clientip', '') }}">
         <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
   </div>
       </div>
