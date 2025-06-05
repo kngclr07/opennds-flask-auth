@@ -274,7 +274,7 @@ def login():
 
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
-	    app.logger.info(f"Login attempt: code={code}, client_ip={client_ip}")
+            app.logger.info(f"Login attempt: code={code}, client_ip={client_ip}")
 
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
@@ -295,7 +295,6 @@ def login():
 
                     db.session.commit()
 
-                    # OPTIONAL: Log the MAC address
                     app.logger.info(f"Client authenticated: IP={client_ip}, MAC={client_mac}")
 
                     return Response("\n".join([
@@ -307,7 +306,8 @@ def login():
                         "200",
                         "OK"
                     ]), mimetype='text/plain')
-                    return Response("\n".join(response), mimetype='text/plain')
+
+        return redirect('/landing')
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
