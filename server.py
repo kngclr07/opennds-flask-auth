@@ -258,29 +258,23 @@ with app.app_context():
     db.create_all()
 
 
-from flask import Response, request, render_template_string
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     message = None
     try:
         client_ip = request.args.get('clientip') or request.remote_addr
-        gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
-        token = request.args.get('token')
-        redir = request.args.get('redir') or 'http://google.com'
-        auth_domain = request.args.get('auth_domain', '')
-        auth_dir = request.args.get('auth_dir', '')
-        origin_url = request.args.get('originurl', '')
 
-        access = UserAccess.query.filter_by(user_ip=client_ip).first()
-
-        if request.method == 'GET':
-            # This is the key part OpenNDS checks for authentication status
+        # This is the "auth check" call by OpenNDS with clientip param
+        if client_ip and request.method == 'GET':
+            access = UserAccess.query.filter_by(user_ip=client_ip).first()
             if access and access.is_active():
                 return Response("Auth: 1\n", mimetype='text/plain')
             else:
                 return Response("Auth: 0\n", mimetype='text/plain')
 
+        # If no client_ip param, serve the login page for the user to input code
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
@@ -300,12 +294,12 @@ def login():
 
                     return Response("Auth: 1\n", mimetype='text/plain')
 
+        # For GET requests without clientip param, show login form
+        return render_template_string(LOGIN_PAGE, message=message)
+
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return "An error occurred, please try again", 500
-
-    # Render your login page if POST fails (invalid code or GET without auth)
-    return render_template_string(LOGIN_PAGE, message=message)
 
 
 @app.route('/status')
