@@ -272,7 +272,7 @@ def login():
 
         access = UserAccess.query.filter_by(user_ip=client_ip).first()
         if access and access.is_active():
-            return Response(Auth: 1\n", mimetype='text/plain'}
+            return Response("Auth: 1\n", mimetype='text/plain')
 
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
@@ -291,7 +291,7 @@ def login():
                     db.session.add(new_access)
                     db.session.commit()
 
-                    return Response(Auth: 1\n", mimetype='text/plain'}
+                    return Response("Auth: 1\n", mimetype='text/plain')
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return "An error occurred, please try again", 500
