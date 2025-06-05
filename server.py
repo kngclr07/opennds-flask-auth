@@ -294,7 +294,7 @@ def login():
                 return Response("Auth: 1\n", mimetype='text/plain')
 
     # If GET or POST with errors, render login form with message
-    return render_template('login.html', message=message, gateway_name=gateway_name, redir=redir)
+    return render_template(message=message, gateway_name=gateway_name, redir=redir)
 
 @app.route('/status')
 def status():
