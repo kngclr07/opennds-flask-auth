@@ -1,7 +1,6 @@
-from flask import Flask, request, render_template_string, redirect, Response
+from flask import Flask, request, render_template_string, redirect, Response, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, timezone
-
 import random
 
 app = Flask(__name__)
@@ -29,7 +28,16 @@ class Voucher(db.Model):
                 self.expires_at = self.expires_at.replace(tzinfo=timezone.utc)
             return now < self.expires_at
 
+class UserAccess(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_ip = db.Column(db.String(45), unique=True, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False)
 
+    def is_active(self):
+        if self.expires_at.tzinfo is None:
+            # Assume it's in UTC and make it timezone-aware
+            self.expires_at = self.expires_at.replace(tzinfo=timezone.utc)
+        return datetime.now(timezone.utc) < self.expires_at
 
 with app.app_context():
     db.create_all()
@@ -53,7 +61,6 @@ def generate(n):
         codes.append(code)
     db.session.commit()
 
-    # HTML template for displaying codes
     html_template = '''
     <!DOCTYPE html>
     <html lang="en">
@@ -105,14 +112,12 @@ def generate(n):
     </html>
     '''
 
-    # Render the HTML with the generated codes
     rendered_html = render_template_string(html_template, codes=codes)
-
-    # Save to a file (e.g., vouchers.html)
     with open('vouchers.html', 'w') as f:
         f.write(rendered_html)
 
     return f"Successfully generated {n} vouchers and saved to vouchers.html."
+
 LOGIN_PAGE = '''
 <!DOCTYPE html>
 <html lang="en">
@@ -243,35 +248,17 @@ LOGIN_PAGE = '''
 </html>
 '''
 
-class UserAccess(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_ip = db.Column(db.String(45), unique=True, nullable=False)
-    expires_at = db.Column(db.DateTime, nullable=False)
-
-    def is_active(self):
-        if self.expires_at.tzinfo is None:
-        # Assume it's in UTC and make it timezone-aware
-           self.expires_at = self.expires_at.replace(tzinfo=timezone.utc)
-        return datetime.now(timezone.utc) < self.expires_at
-
-with app.app_context():
-    db.create_all()
-
-
-
-
 @app.route('/authcheck')
 def authcheck():
     client_ip = request.args.get('clientip')
     if not client_ip:
-        return Response("Auth: 0\n", mimetype='text/plain')
+        return Response("0\n", mimetype='text/plain')
 
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-        return Response("Auth: 1\n", mimetype='text/plain')
+        return Response("1\n", mimetype='text/plain')
     else:
-        return Response("Auth: 0\n", mimetype='text/plain')
-
+        return Response("0\n", mimetype='text/plain')
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -283,14 +270,6 @@ def login():
             message = 'Client IP is missing.'
             return render_template_string(LOGIN_PAGE, message=message)
 
-        access = UserAccess.query.filter_by(user_ip=client_ip).first()
-
-        if request.method == 'GET':
-            if access and access.is_active():
-                return Response("Auth: 1\n", mimetype='text/plain')
-            else:
-                return Response("Auth: 0\n", mimetype='text/plain')
-
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
@@ -300,22 +279,34 @@ def login():
                 if not voucher:
                     message = 'Invalid voucher code'
                 else:
+                    # Delete the voucher
                     db.session.delete(voucher)
-                    new_access = UserAccess(
-                        user_ip=client_ip,
-                        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
-                    )
-                    db.session.add(new_access)
+                    
+                    # Create or update user access
+                    access = UserAccess.query.filter_by(user_ip=client_ip).first()
+                    if access:
+                        access.expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
+                    else:
+                        access = UserAccess(
+                            user_ip=client_ip,
+                            expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                        )
+                        db.session.add(access)
+                    
                     db.session.commit()
+                    # Return the proper response format for OpenNDS
+                    response = f"Auth: 1\n"
+                    response += f"Seconds: 86400\n"  # 24 hours
+                    response += f"Upload: 0\n"      # Unlimited upload
+                    response += f"Download: 0\n"    # Unlimited download
+                    return Response(response, mimetype='text/plain')
 
-                    return Response("Auth: 1\n", mimetype='text/plain')
+        # For GET requests or failed POST, show the login page
+        return render_template_string(LOGIN_PAGE, message=message)
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return f"An error occurred: {str(e)}", 500
-
-    return render_template_string(LOGIN_PAGE, message=message)
-
 
 @app.route('/status')
 def status():
