@@ -306,7 +306,7 @@ def login():
 
     # Render your login page if POST fails (invalid code or GET without auth)
     return render_template_string(LOGIN_PAGE, message=message)
-)
+
 
 @app.route('/status')
 def status():
