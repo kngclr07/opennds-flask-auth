@@ -295,7 +295,7 @@ def login():
                     db.session.add(new_access)
                     db.session.commit()
 
-                    return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
+                    return redirect(f"http://192.168.1.3:2050/opennds_auth?token={token}&redir={redir}")
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
