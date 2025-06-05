@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string, redirect
+from flask import Flask, request, render_template_string, redirect, render_template
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, timezone
 
