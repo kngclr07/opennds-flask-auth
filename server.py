@@ -273,31 +273,33 @@ def login():
     # Check existing access
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
-            response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
-            if redir:
-                response_url += f"&redir={urllib.parse.quote(redir)}"
-            return redirect(response_url)
+        auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+        response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+        if redir:
+            response_url += f"&redir={urllib.parse.quote(redir)}"
+        return redirect(response_url)
 
-        if request.method == 'POST':
-            code = request.form.get('code', '').strip()
-            if not code or len(code) != 7 or not code.isdigit():
-                message = 'Please enter a valid 7-digit code'
+    if request.method == 'POST':
+        code = request.form.get('code', '').strip()
+        if not code or len(code) != 7 or not code.isdigit():
+            message = 'Please enter a valid 7-digit code'
+        else:
+            voucher = Voucher.query.filter_by(code=code).first()
+            if not voucher:
+                message = 'Invalid voucher code'
             else:
-                voucher = Voucher.query.filter_by(code=code).first()
-                if not voucher:
-                    message = 'Invalid voucher code'
-                else:
-                    # Process valid voucher
-                    db.session.delete(voucher)
-                    new_access = UserAccess(
-                        user_ip=client_ip,
-                        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
-                    )
-                    db.session.add(new_access)
-                    db.session.commit()
+                # Process valid voucher
+                db.session.delete(voucher)
+                new_access = UserAccess(
+                    user_ip=client_ip,
+                    expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                )
+                db.session.add(new_access)
+                db.session.commit()
 
-                    return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
+                return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
+
+    return render_template_string(LOGIN_PAGE, message=message)
 
                     
 
