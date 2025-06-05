@@ -260,22 +260,25 @@ with app.app_context():
 
 
 
+@app.route('/authcheck')
+def authcheck():
+    client_ip = request.args.get('clientip')
+    if not client_ip:
+        return Response("Auth: 0\n", mimetype='text/plain')
+
+    access = UserAccess.query.filter_by(user_ip=client_ip).first()
+    if access and access.is_active():
+        return Response("Auth: 1\n", mimetype='text/plain')
+    else:
+        return Response("Auth: 0\n", mimetype='text/plain')
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     message = None
     try:
-        client_ip = request.args.get('clientip') or request.remote_addr
-
-        # This is the "auth check" call by OpenNDS with clientip param
-        if client_ip and request.method == 'GET':
-            access = UserAccess.query.filter_by(user_ip=client_ip).first()
-            if access and access.is_active():
-                return Response("Auth: 1\n", mimetype='text/plain')
-            else:
-                return Response("Auth: 0\n", mimetype='text/plain')
-
-        # If no client_ip param, serve the login page for the user to input code
         if request.method == 'POST':
+            client_ip = request.form.get('clientip') or request.remote_addr
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
@@ -292,11 +295,11 @@ def login():
                     db.session.add(new_access)
                     db.session.commit()
 
-                    return Response("Auth: 1\n", mimetype='text/plain')
+                    # After successful login, redirect user or show success
+                    return redirect(request.args.get('redir', '/'))
 
-        # For GET requests without clientip param, show login form
+        # GET request: show login form
         return render_template_string(LOGIN_PAGE, message=message)
-
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return "An error occurred, please try again", 500
