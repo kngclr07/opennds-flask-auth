@@ -318,24 +318,25 @@ def login():
 def status():
     return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
 
-@app.route('/auth', methods=['GET'])
+@app.route('/auth')
 def auth():
     client_ip = request.args.get('clientip')
     if not client_ip:
-        return jsonify({'error': 'clientip parameter missing'}), 400
+        return Response("auth 0", mimetype='text/plain')  # Deny access
 
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-        return jsonify({
-            'authenticated': True,
-            'username': f"user_{client_ip}",
-            'session_timeout': 86400,
-            'download_quota': 0,
-            'upload_quota': 0,
-            'idle_timeout': 0
-        })
+        return Response("\n".join([
+            "auth_log",
+            "seconds 86400",
+            "upload 0",
+            "download 0",
+            "",
+            "200",
+            "OK"
+        ]), mimetype='text/plain')
     else:
-        return jsonify({'authenticated': False})
+        return Response("auth 0", mimetype='text/plain')  # Not authenticated
 
 @app.route('/logout', methods=['GET'])
 def logout():
