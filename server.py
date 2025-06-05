@@ -294,19 +294,26 @@ def login():
                         db.session.add(access)
                     
                     db.session.commit()
-                    # Return the proper response format for OpenNDS
-                    response = f"Auth: 1\n"
-                    response += f"Seconds: 86400\n"  # 24 hours
-                    response += f"Upload: 0\n"      # Unlimited upload
-                    response += f"Download: 0\n"    # Unlimited download
-                    return Response(response, mimetype='text/plain')
+                    
+                    # Proper OpenNDS response format
+                    response = Response(
+                        "1\n"          # Authentication status
+                        "86400\n"      # Session duration in seconds
+                        "0\n"          # Upload limit (0 = unlimited)
+                        "0\n"          # Download limit (0 = unlimited)
+                        "\n"           # Empty line
+                        "200\n"        # HTTP status code
+                        "OK",          # Status message
+                        mimetype='text/plain'
+                    )
+                    return response
 
         # For GET requests or failed POST, show the login page
         return render_template_string(LOGIN_PAGE, message=message)
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
-        return f"An error occurred: {str(e)}", 500
+        return Response("0", mimetype='text/plain')
 
 @app.route('/status')
 def status():
