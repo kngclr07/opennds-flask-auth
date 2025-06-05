@@ -272,7 +272,7 @@ def login():
 
     # Check existing access
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
-        if access and access.is_active():
+    if access and access.is_active():
             auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
             response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
             if redir:
