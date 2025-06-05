@@ -317,7 +317,11 @@ def status():
 
 @app.route('/auth')
 def auth():
-    client_ip = request.args.get('clientip')
+    client_ip = (
+        request.args.get('clientip') or 
+        request.remote_addr
+    )
+    app.logger.info(f"AUTH CHECK: IP received = {client_ip}")
     if not client_ip:
         return jsonify({'authenticated': False})
 
@@ -333,6 +337,7 @@ def auth():
         })
     else:
         return jsonify({'authenticated': False})
+    
 
 @app.route('/logout', methods=['GET'])
 def logout():
