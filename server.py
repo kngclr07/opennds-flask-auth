@@ -264,7 +264,7 @@ def login():
     # openNDS passes client info differently than nodogsplash
     client_ip = request.args.get('clientip') or request.remote_addr
     gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
-    redir = request.args.get('redir') or 'http://1.1.1.1'
+    redir = request.args.get('redir') or 'http://192.168.1.3:2050/opennds_auth?token={token}&redir=http://google.com'
     auth_domain = request.args.get('auth_domain', '')
     auth_dir = request.args.get('auth_dir', '')
     origin_url = request.args.get('originurl', '')
