@@ -292,11 +292,6 @@ def login():
                     db.session.commit()
 
                     return Response("Auth: 1\n", mimetype='text/plain')
-    except Exception as e:
-        app.logger.error(f"Login error: {str(e)}")
-        return "An error occurred, please try again", 500
-
-    return render_template_string(LOGIN_PAGE, message=message)
 
 @app.route('/status')
 def status():
