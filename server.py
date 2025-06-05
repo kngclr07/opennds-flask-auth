@@ -260,7 +260,7 @@ with app.app_context():
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
-    message = Hello
+    message = "Hello"
     client_ip = request.args.get('clientip') or request.remote_addr
     gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
     token = request.args.get('token')
