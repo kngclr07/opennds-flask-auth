@@ -276,7 +276,7 @@ def login():
             response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
             if redir:
                 response_url += f"&redir={urllib.parse.quote(redir)}"
-            return redirect(response_url)
+            return Response("Auth: 1\n", mimetype='text/plain')
 
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
@@ -295,7 +295,7 @@ def login():
                     db.session.add(new_access)
                     db.session.commit()
 
-                    return redirect(f"http://192.168.1.3:2050/opennds_auth?token={token}&redir={redir}")
+                    return Response("Auth: 1\n", mimetype='text/plain')
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
