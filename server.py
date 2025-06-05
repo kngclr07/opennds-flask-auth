@@ -261,14 +261,21 @@ with app.app_context():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     message = None
-    user_ip = request.remote_addr  # Or some other user identifier
+    # openNDS passes client info differently than nodogsplash
+    client_ip = request.args.get('clientip') or request.remote_addr
+    gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
+    redir = request.args.get('redir') or 'http://1.1.1.1'
+    auth_domain = request.args.get('auth_domain', '')
+    auth_dir = request.args.get('auth_dir', '')
+    origin_url = request.args.get('originurl', '')
 
     # Check if user already has active access
-    access = UserAccess.query.filter_by(user_ip=user_ip).first()
+    access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-        # User already has access, redirect immediately
-        redir_url = request.args.get('redir') or 'http://1.1.1.1'
-        return redirect(redir_url)
+        # User already has access, redirect with auth token
+        auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+        auth_response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+        return redirect(auth_response_url)
 
     if request.method == 'POST':
         code = request.form.get('code', '').strip()
@@ -282,14 +289,48 @@ def login():
 
             # Create new user access valid for 24 hours
             now = datetime.now(timezone.utc)
-            new_access = UserAccess(user_ip=user_ip, expires_at=now + timedelta(hours=24))
+            new_access = UserAccess(user_ip=client_ip, expires_at=now + timedelta(hours=24))
             db.session.add(new_access)
             db.session.commit()
 
-            redir_url = request.args.get('redir') or 'http://1.1.1.1'
-            return redirect(redir_url)
+            # Generate auth token for openNDS
+            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+            auth_response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+            return redirect(auth_response_url)
 
+    # For GET requests, show the login page with the required parameters
     return render_template_string(LOGIN_PAGE, message=message)
+
+@app.route('/auth', methods=['GET'])
+def auth():
+    """Endpoint that openNDS will call to check if client is authenticated"""
+    client_ip = request.args.get('clientip')
+    if not client_ip:
+        return jsonify({'error': 'clientip parameter missing'}), 400
+    
+    access = UserAccess.query.filter_by(user_ip=client_ip).first()
+    if access and access.is_active():
+        # Client is authenticated
+        return jsonify({
+            'authenticated': True,
+            'username': f"user_{client_ip}",
+            'session_timeout': 86400,  # 24 hours in seconds
+            'download_quota': 0,  # 0 means unlimited
+            'upload_quota': 0,
+            'idle_timeout': 0
+        })
+    else:
+        # Client not authenticated
+        return jsonify({'authenticated': False})
+
+@app.route('/logout', methods=['GET'])
+def logout():
+    """Endpoint for logging out a client (optional)"""
+    client_ip = request.args.get('clientip')
+    if client_ip:
+        UserAccess.query.filter_by(user_ip=client_ip).delete()
+        db.session.commit()
+    return jsonify({'status': 'success'})
 
 @app.route('/admin/active_users')
 def active_users():
