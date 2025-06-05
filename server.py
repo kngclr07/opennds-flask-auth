@@ -298,7 +298,7 @@ def login():
                     app.logger.info(f"Client authenticated: IP={client_ip}, MAC={client_mac}")
 
                     response = [
-                        "auth 1",
+                        "auth_log",
                         "seconds 86400",
                         "upload 0",
                         "download 0",
@@ -309,7 +309,7 @@ def login():
                     return Response("\n".join(response), mimetype='text/plain')
 
         # Render login page with hidden inputs for IP and MAC
-        return render_template_string(LOGIN_PAGE, message=message, client_ip=client_ip, client_mac=client_mac)
+        return redirect('/landing')
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
@@ -361,6 +361,48 @@ def active_users():
             'is_active': now < u.expires_at
         })
     return {'active_users': active_list}
+
+@app.route('/landing')
+def landing():
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Access Granted</title>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                background: linear-gradient(to right, #00c6ff, #0072ff);
+                color: white;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+            }
+            .container {
+                text-align: center;
+            }
+            h1 {
+                font-size: 2.5em;
+                margin-bottom: 20px;
+            }
+            p {
+                font-size: 1.2em;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>You're Connected 🎉</h1>
+            <p>Enjoy your unlimited internet access for the next 24 hours.</p>
+        </div>
+    </body>
+    </html>
+    """)
+
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
