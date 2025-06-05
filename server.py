@@ -261,104 +261,73 @@ with app.app_context():
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     message = None
-    # openNDS passes client info differently than nodogsplash
-    client_ip = request.args.get('clientip') or request.remote_addr
-    gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
-    token = request.args.get('token')  # Important for openNDS auth
-    redir = request.args.get('redir') or 'http://google.com'
-    auth_domain = request.args.get('auth_domain', '')
-    auth_dir = request.args.get('auth_dir', '')
-    origin_url = request.args.get('originurl', '')
+    try:
+        client_ip = request.args.get('clientip') or request.remote_addr
+        gateway_name = request.args.get('gatewayname', 'WiFi Gateway')
+        token = request.args.get('token')
+        redir = request.args.get('redir') or 'http://google.com'
+        auth_domain = request.args.get('auth_domain', '')
+        auth_dir = request.args.get('auth_dir', '')
+        origin_url = request.args.get('originurl', '')
 
-    # Check existing access
-    access = UserAccess.query.filter_by(user_ip=client_ip).first()
-    if access and access.is_active():
-        auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
-        response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
-        if redir:
-            response_url += f"&redir={urllib.parse.quote(redir)}"
-        return redirect(response_url)
+        access = UserAccess.query.filter_by(user_ip=client_ip).first()
+        if access and access.is_active():
+            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+            response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+            if redir:
+                response_url += f"&redir={urllib.parse.quote(redir)}"
+            return redirect(response_url)
 
-    if request.method == 'POST':
-        code = request.form.get('code', '').strip()
-        if not code or len(code) != 7 or not code.isdigit():
-            message = 'Please enter a valid 7-digit code'
-        else:
-            voucher = Voucher.query.filter_by(code=code).first()
-            if not voucher:
-                message = 'Invalid voucher code'
+        if request.method == 'POST':
+            code = request.form.get('code', '').strip()
+            if not code or len(code) != 7 or not code.isdigit():
+                message = 'Please enter a valid 7-digit code'
             else:
-                # Process valid voucher
-                db.session.delete(voucher)
-                new_access = UserAccess(
-                    user_ip=client_ip,
-                    expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
-                )
-                db.session.add(new_access)
-                db.session.commit()
+                voucher = Voucher.query.filter_by(code=code).first()
+                if not voucher:
+                    message = 'Invalid voucher code'
+                else:
+                    db.session.delete(voucher)
+                    new_access = UserAccess(
+                        user_ip=client_ip,
+                        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                    )
+                    db.session.add(new_access)
+                    db.session.commit()
 
-                return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
+                    return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
 
-
-                
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return "An error occurred, please try again", 500
 
-# Add this endpoint for health checks
+    return render_template_string(LOGIN_PAGE, message=message)
+
 @app.route('/status')
 def status():
     return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
 
-    if request.method == 'POST':
-        code = request.form.get('code', '').strip()
-        voucher = Voucher.query.filter_by(code=code).first()
-
-        if not voucher:
-            message = 'Invalid voucher code.'
-        else:
-            # Delete voucher after first redemption
-            db.session.delete(voucher)
-
-            # Create new user access valid for 24 hours
-            now = datetime.now(timezone.utc)
-            new_access = UserAccess(user_ip=client_ip, expires_at=now + timedelta(hours=24))
-            db.session.add(new_access)
-            db.session.commit()
-
-            # Generate auth token for openNDS
-            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
-            auth_response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
-            return redirect(auth_response_url)
-
-    # For GET requests, show the login page with the required parameters
-    return render_template_string(LOGIN_PAGE, message=message)
-
 @app.route('/auth', methods=['GET'])
 def auth():
-    """Endpoint that openNDS will call to check if client is authenticated"""
     client_ip = request.args.get('clientip')
     if not client_ip:
         return jsonify({'error': 'clientip parameter missing'}), 400
-    
+
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-        # Client is authenticated
         return jsonify({
             'authenticated': True,
             'username': f"user_{client_ip}",
-            'session_timeout': 86400,  # 24 hours in seconds
-            'download_quota': 0,  # 0 means unlimited
+            'session_timeout': 86400,
+            'download_quota': 0,
             'upload_quota': 0,
             'idle_timeout': 0
         })
     else:
-        # Client not authenticated
         return jsonify({'authenticated': False})
 
 @app.route('/logout', methods=['GET'])
 def logout():
-    """Endpoint for logging out a client (optional)"""
     client_ip = request.args.get('clientip')
     if client_ip:
         UserAccess.query.filter_by(user_ip=client_ip).delete()
@@ -371,7 +340,6 @@ def active_users():
     active_list = []
     now = datetime.now(timezone.utc)
     for u in users:
-        # Ensure timezone-awareness
         if u.expires_at.tzinfo is None:
             u.expires_at = u.expires_at.replace(tzinfo=timezone.utc)
         active_list.append({
@@ -380,5 +348,6 @@ def active_users():
             'is_active': now < u.expires_at
         })
     return {'active_users': active_list}
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8080)
