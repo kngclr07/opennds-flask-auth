@@ -269,13 +269,49 @@ def login():
     auth_dir = request.args.get('auth_dir', '')
     origin_url = request.args.get('originurl', '')
 
-    # Check if user already has active access
-    access = UserAccess.query.filter_by(user_ip=client_ip).first()
-    if access and access.is_active():
-        # User already has access, redirect with auth token
-        auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
-        auth_response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
-        return redirect(auth_response_url)
+    # Check existing access
+        access = UserAccess.query.filter_by(user_ip=client_ip).first()
+        if access and access.is_active():
+            auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+            response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+            if redir:
+                response_url += f"&redir={urllib.parse.quote(redir)}"
+            return redirect(response_url)
+
+        if request.method == 'POST':
+            code = request.form.get('code', '').strip()
+            if not code or len(code) != 7 or not code.isdigit():
+                message = 'Please enter a valid 7-digit code'
+            else:
+                voucher = Voucher.query.filter_by(code=code).first()
+                if not voucher:
+                    message = 'Invalid voucher code'
+                else:
+                    # Process valid voucher
+                    db.session.delete(voucher)
+                    new_access = UserAccess(
+                        user_ip=client_ip,
+                        expires_at=datetime.now(timezone.utc) + timedelta(hours=24)
+                    )
+                    db.session.add(new_access)
+                    db.session.commit()
+
+                    auth_token = f"openNDS_auth_{random.randint(100000,999999)}"
+                    response_url = f"{auth_domain}{auth_dir}/?clientip={client_ip}&authkey={auth_token}"
+                    if redir:
+                        response_url += f"&redir={urllib.parse.quote(redir)}"
+                    return redirect(response_url)
+
+        return render_template_string(LOGIN_PAGE, message=message)
+
+    except Exception as e:
+        app.logger.error(f"Login error: {str(e)}")
+        return "An error occurred, please try again", 500
+
+# Add this endpoint for health checks
+@app.route('/status')
+def status():
+    return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
 
     if request.method == 'POST':
         code = request.form.get('code', '').strip()
