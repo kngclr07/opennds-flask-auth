@@ -236,7 +236,8 @@ LOGIN_PAGE = '''
     <h2>WIFI</h2>
     <form method="POST" autocomplete="off" novalidate>
       <div class="input-wrapper">
-	<input type="hidden" name="clientip" value="{{ client_ip }}">
+	<input type="hidden" name="clientip" value="{{ request.args.get('clientip') }}">
+ 	<input type="hidden" name="clientmac" value="{{ request.args.get('clientmac') }}">
         <input type="text" name="code" maxlength="7" pattern="\\d{7}" placeholder="7-digit voucher code" required autofocus>
       </div>
       <button type="submit">Connect</button>
@@ -265,11 +266,7 @@ def authcheck():
 def login():
     message = None
     try:
-        client_ip = (
-            request.args.get('clientip') or 
-            request.form.get('clientip') or 
-            request.remote_addr
-        )
+        client_ip = request.args.get('clientip') or request.form.get('clientip')
         client_mac = request.args.get('clientmac') or request.form.get('clientmac')
 
         if request.method == 'POST':
@@ -294,7 +291,6 @@ def login():
                         db.session.add(access)
 
                     db.session.commit()
-
                     app.logger.info(f"Client authenticated: IP={client_ip}, MAC={client_mac}")
 
                     return Response("\n".join([
@@ -307,7 +303,7 @@ def login():
                         "OK"
                     ]), mimetype='text/plain')
 
-        return redirect('/landing')
+        return render_template('login.html', message=message)
 
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
@@ -318,25 +314,25 @@ def login():
 def status():
     return jsonify({'status': 'ok', 'time': datetime.now(timezone.utc).isoformat()})
 
+
 @app.route('/auth')
 def auth():
     client_ip = request.args.get('clientip')
     if not client_ip:
-        return Response("auth 0", mimetype='text/plain')  # Deny access
+        return jsonify({'authenticated': False})
 
     access = UserAccess.query.filter_by(user_ip=client_ip).first()
     if access and access.is_active():
-        return Response("\n".join([
-            "auth_log",
-            "seconds 86400",
-            "upload 0",
-            "download 0",
-            "",
-            "200",
-            "OK"
-        ]), mimetype='text/plain')
+        return jsonify({
+            'authenticated': True,
+            'username': f"user_{client_ip}",
+            'session_timeout': 86400,
+            'download_quota': 0,
+            'upload_quota': 0,
+            'idle_timeout': 0
+        })
     else:
-        return Response("auth 0", mimetype='text/plain')  # Not authenticated
+        return jsonify({'authenticated': False})
 
 @app.route('/logout', methods=['GET'])
 def logout():
