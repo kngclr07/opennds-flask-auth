@@ -258,6 +258,8 @@ with app.app_context():
     db.create_all()
 
 
+from flask import Response, request, render_template_string
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     message = None
@@ -271,8 +273,13 @@ def login():
         origin_url = request.args.get('originurl', '')
 
         access = UserAccess.query.filter_by(user_ip=client_ip).first()
-        if access and access.is_active():
-            return Response("Auth: 1\n", mimetype='text/plain')
+
+        if request.method == 'GET':
+            # This is the key part OpenNDS checks for authentication status
+            if access and access.is_active():
+                return Response("Auth: 1\n", mimetype='text/plain')
+            else:
+                return Response("Auth: 0\n", mimetype='text/plain')
 
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
@@ -292,6 +299,14 @@ def login():
                     db.session.commit()
 
                     return Response("Auth: 1\n", mimetype='text/plain')
+
+    except Exception as e:
+        app.logger.error(f"Login error: {str(e)}")
+        return "An error occurred, please try again", 500
+
+    # Render your login page if POST fails (invalid code or GET without auth)
+    return render_template_string(LOGIN_PAGE, message=message)
+)
 
 @app.route('/status')
 def status():
