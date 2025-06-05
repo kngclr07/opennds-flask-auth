@@ -1,4 +1,4 @@
-from flask import Flask, request, render_template_string, redirect, Response, jsonify
+from flask import Flask, request, render_template_string, redirect, Response, jsonify, logging
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime, timedelta, timezone
 import random
@@ -274,6 +274,7 @@ def login():
 
         if request.method == 'POST':
             code = request.form.get('code', '').strip()
+	    app.logger.info(f"Login attempt: code={code}, client_ip={client_ip}")
 
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
