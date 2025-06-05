@@ -299,10 +299,8 @@ def login():
 
                 return redirect(f"http://192.168.1.1:2050/opennds_auth?token={token}&redir={redir}")
 
-    return render_template_string(LOGIN_PAGE, message=message)
 
-                    
-
+                
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return "An error occurred, please try again", 500
