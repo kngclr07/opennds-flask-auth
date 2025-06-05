@@ -277,8 +277,21 @@ def authcheck():
 def login():
     message = None
     try:
+        client_ip = request.args.get('clientip') or request.form.get('clientip') or request.remote_addr
+        
+        if not client_ip:
+            message = 'Client IP is missing.'
+            return render_template_string(LOGIN_PAGE, message=message)
+
+        access = UserAccess.query.filter_by(user_ip=client_ip).first()
+
+        if request.method == 'GET':
+            if access and access.is_active():
+                return Response("Auth: 1\n", mimetype='text/plain')
+            else:
+                return Response("Auth: 0\n", mimetype='text/plain')
+
         if request.method == 'POST':
-             client_ip = request.args.get('clientip') or request.form.get('clientip') or request.remote_addr
             code = request.form.get('code', '').strip()
             if not code or len(code) != 7 or not code.isdigit():
                 message = 'Please enter a valid 7-digit code'
@@ -295,14 +308,13 @@ def login():
                     db.session.add(new_access)
                     db.session.commit()
 
-                    # After successful login, redirect user or show success
-                    return redirect(request.args.get('redir', '/'))
+                    return Response("Auth: 1\n", mimetype='text/plain')
 
-        # GET request: show login form
-        return render_template_string(LOGIN_PAGE, message=message)
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
-        return "An error occurred, please try again", 500
+        return f"An error occurred: {str(e)}", 500
+
+    return render_template_string(LOGIN_PAGE, message=message)
 
 
 @app.route('/status')
