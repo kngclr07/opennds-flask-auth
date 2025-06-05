@@ -309,9 +309,6 @@ def login():
                     ]
                     return Response("\n".join(response), mimetype='text/plain')
 
-        # Render login page with hidden inputs for IP and MAC
-        return Response("\n".join(response), mimetype='text/plain')
-
     except Exception as e:
         app.logger.error(f"Login error: {str(e)}")
         return Response("auth 0", mimetype='text/plain')
